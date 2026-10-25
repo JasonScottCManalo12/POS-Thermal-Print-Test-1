@@ -30,6 +30,38 @@ class PrinterCommands {
         ...size(),
       ];
 
+  static List<int> fontTestDemo() => [
+        ...initialize(),
+        ...align(1),
+        ...bold(true),
+        ...text('FONT TEST'),
+        ...lineFeed(),
+        ...bold(false),
+        ...size(),
+        ...text('Normal text'),
+        ...lineFeed(),
+        ...bold(true),
+        ...text('Bold text'),
+        ...lineFeed(),
+        ...bold(false),
+        ...size(doubleWidth: true),
+        ...text('Double width'),
+        ...lineFeed(),
+        ...size(doubleHeight: true),
+        ...text('Double height'),
+        ...lineFeed(),
+        ...size(doubleWidth: true, doubleHeight: true),
+        ...text('DOUBLE BOTH'),
+        ...lineFeed(),
+        ...size(),
+        ...align(0),
+        ...text('Left aligned'),
+        ...lineFeed(),
+        ...align(2),
+        ...text('Right aligned'),
+        ...lineFeed(3),
+      ];
+
   static List<int> formattedDemo() => [
         ...initialize(),
         ...align(1),
