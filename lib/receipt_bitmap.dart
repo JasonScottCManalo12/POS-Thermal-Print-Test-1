@@ -47,7 +47,7 @@ class ReceiptData {
       discountCentavos <= subtotalCentavos;
 }
 
-/// Renders receipt data into a monochrome 384-dot bitmap for ESC/POS raster printing.
+/// Renders receipt data into the exact same 384-dot bitmap used for printing.
 class ReceiptBitmap {
   static const int paperWidth = 384;
   static const double margin = 6;
@@ -75,8 +75,52 @@ class ReceiptBitmap {
       buildReceipt(sampleData());
 
   static Future<List<int>> buildReceipt(ReceiptData receipt) async {
+    final image = await _renderImage(receipt);
+    final data = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+    final height = image.height;
+    image.dispose();
+    if (data == null) throw Exception('Could not render receipt bitmap.');
+
+    const bytesPerRow = paperWidth ~/ 8;
+    final raster = List<int>.filled(bytesPerRow * height, 0);
+    for (var py = 0; py < height; py++) {
+      for (var px = 0; px < paperWidth; px++) {
+        final offset = (py * paperWidth + px) * 4;
+        final red = data.getUint8(offset);
+        final green = data.getUint8(offset + 1);
+        final blue = data.getUint8(offset + 2);
+        final luminance = (red * 299 + green * 587 + blue * 114) ~/ 1000;
+        if (luminance < 180) {
+          raster[py * bytesPerRow + px ~/ 8] |= 0x80 >> (px % 8);
+        }
+      }
+    }
+
+    return [
+      0x1B, 0x40,
+      0x1D, 0x76, 0x30, 0x00,
+      bytesPerRow & 0xFF, (bytesPerRow >> 8) & 0xFF,
+      height & 0xFF, (height >> 8) & 0xFF,
+      ...raster,
+      ...List<int>.filled(4, 0x0A),
+    ];
+  }
+
+  /// Produces a PNG of the exact same canvas used by [buildReceipt].
+  /// The phone preview therefore uses the printer's actual 384-dot layout.
+  static Future<List<int>> buildPreviewPng(ReceiptData receipt) async {
+    final image = await _renderImage(receipt);
+    final data = await image.toByteData(format: ui.ImageByteFormat.png);
+    image.dispose();
+    if (data == null) throw Exception('Could not render receipt preview.');
+    return data.buffer.asUint8List();
+  }
+
+  static Future<ui.Image> _renderImage(ReceiptData receipt) async {
     if (!receipt.hasValidTotals) {
-      throw ArgumentError('Receipt totals are invalid. Check quantities, prices, and discount.');
+      throw ArgumentError(
+        'Receipt totals are invalid. Check quantities, prices, and discount.',
+      );
     }
 
     final recorder = ui.PictureRecorder();
@@ -192,33 +236,7 @@ class ReceiptBitmap {
     final height = y.ceil() + 8;
     final picture = recorder.endRecording();
     final image = await picture.toImage(paperWidth, height);
-    final data = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
-    image.dispose();
     picture.dispose();
-    if (data == null) throw Exception('Could not render receipt bitmap.');
-
-    const bytesPerRow = paperWidth ~/ 8;
-    final raster = List<int>.filled(bytesPerRow * height, 0);
-    for (var py = 0; py < height; py++) {
-      for (var px = 0; px < paperWidth; px++) {
-        final offset = (py * paperWidth + px) * 4;
-        final red = data.getUint8(offset);
-        final green = data.getUint8(offset + 1);
-        final blue = data.getUint8(offset + 2);
-        final luminance = (red * 299 + green * 587 + blue * 114) ~/ 1000;
-        if (luminance < 180) {
-          raster[py * bytesPerRow + px ~/ 8] |= 0x80 >> (px % 8);
-        }
-      }
-    }
-
-    return [
-      0x1B, 0x40,
-      0x1D, 0x76, 0x30, 0x00,
-      bytesPerRow & 0xFF, (bytesPerRow >> 8) & 0xFF,
-      height & 0xFF, (height >> 8) & 0xFF,
-      ...raster,
-      ...List<int>.filled(4, 0x0A),
-    ];
+    return image;
   }
 }
