@@ -67,7 +67,7 @@ class ReceiptBitmap {
           ReceiptLineItem(name: 'Bread', quantity: 1, unitPriceCentavos: 4500),
           ReceiptLineItem(name: 'Milk', quantity: 1, unitPriceCentavos: 7850),
         ],
-        discountCentavos: 0,
+        discountCentavos: 500,
         footer: 'Thank you!',
       );
 
