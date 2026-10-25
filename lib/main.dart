@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_classic_bluetooth/flutter_classic_bluetooth.dart';
 import 'printer_commands.dart';
 import 'receipt_bitmap.dart';
+import 'receipt_builder_screen.dart';
 
 void main() => runApp(const ThermalPrintTestApp());
 
@@ -163,6 +164,22 @@ class _PrinterTestHomeState extends State<PrinterTestHome> {
 
   Future<List<int>> buildBitmapTest() => ReceiptBitmap.buildReceipt(ReceiptBitmap.sampleData());
 
+  Future<void> openReceiptBuilder() async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => ReceiptBuilderScreen(
+          onPrint: (receipt) async {
+            final bytes = await ReceiptBitmap.buildReceipt(receipt);
+            await sendBytes(bytes, 'Custom receipt sent — check the paper');
+            if (status == 'Print failed') {
+              throw Exception(errorMessage ?? 'Printer did not accept the receipt.');
+            }
+          },
+        ),
+      ),
+    );
+  }
+
   Future<void> printBitmapTest() async {
     try {
       final bytes = await buildBitmapTest();
@@ -287,6 +304,12 @@ class _PrinterTestHomeState extends State<PrinterTestHome> {
                 label: const Text('PRINT DYNAMIC RECEIPT DEMO'),
               ),
               const SizedBox(height: 8),
+              FilledButton.icon(
+                onPressed: printing ? null : openReceiptBuilder,
+                icon: const Icon(Icons.edit_note),
+                label: const Text('BUILD A CUSTOM RECEIPT'),
+              ),
+              const SizedBox(height: 8),
               OutlinedButton.icon(
                 onPressed: disconnectPrinter,
                 icon: const Icon(Icons.bluetooth_disabled),
@@ -310,7 +333,7 @@ class _PrinterTestHomeState extends State<PrinterTestHome> {
               )),
             const SizedBox(height: 8),
             const Text(
-              'The native font test exercises ESC/POS style controls. The dynamic receipt demo calculates line totals, subtotal, discount, and total from receipt data, then prints the layout as a monochrome bitmap. Sample data only — not a real sale.',
+              'The native font test exercises ESC/POS style controls. The dynamic demo uses sample data. Build a custom receipt to enter item names, quantities, unit prices, and discounts. This capstone is a printer test, not a real sale.',
               textAlign: TextAlign.center,
             ),
           ],
