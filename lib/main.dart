@@ -161,12 +161,12 @@ class _PrinterTestHomeState extends State<PrinterTestHome> {
     }
   }
 
-  Future<List<int>> buildBitmapTest() => ReceiptBitmap.buildSampleReceipt();
+  Future<List<int>> buildBitmapTest() => ReceiptBitmap.buildReceipt(ReceiptBitmap.sampleData());
 
   Future<void> printBitmapTest() async {
     try {
       final bytes = await buildBitmapTest();
-      await sendBytes(bytes, 'Custom bitmap receipt sent — check the paper');
+      await sendBytes(bytes, 'Dynamic receipt demo sent — check the paper');
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -284,7 +284,7 @@ class _PrinterTestHomeState extends State<PrinterTestHome> {
               FilledButton.icon(
                 onPressed: printing ? null : printBitmapTest,
                 icon: const Icon(Icons.image_outlined),
-                label: const Text('PRINT CUSTOM BITMAP RECEIPT'),
+                label: const Text('PRINT DYNAMIC RECEIPT DEMO'),
               ),
               const SizedBox(height: 8),
               OutlinedButton.icon(
@@ -310,7 +310,7 @@ class _PrinterTestHomeState extends State<PrinterTestHome> {
               )),
             const SizedBox(height: 8),
             const Text(
-              'The native font test exercises ESC/POS style controls. The custom receipt test lays out item rows and totals in Flutter, then sends the whole receipt as a monochrome raster image.',
+              'The native font test exercises ESC/POS style controls. The dynamic receipt demo calculates line totals, subtotal, discount, and total from receipt data, then prints the layout as a monochrome bitmap. Sample data only — not a real sale.',
               textAlign: TextAlign.center,
             ),
           ],
