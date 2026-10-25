@@ -2,13 +2,83 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
-/// Renders a bold, full-width 384-dot receipt for the SENDA printer test.
+/// One receipt row. Prices use integer centavos to avoid floating-point money math.
+class ReceiptLineItem {
+  const ReceiptLineItem({
+    required this.name,
+    required this.quantity,
+    required this.unitPriceCentavos,
+  })  : assert(quantity > 0),
+        assert(unitPriceCentavos >= 0);
+
+  final String name;
+  final int quantity;
+  final int unitPriceCentavos;
+
+  int get lineTotalCentavos => quantity * unitPriceCentavos;
+}
+
+/// Data-driven receipt input. Totals are calculated from the item rows.
+class ReceiptData {
+  const ReceiptData({
+    required this.storeName,
+    required this.receiptTitle,
+    required this.items,
+    this.discountCentavos = 0,
+    this.footer = 'Thank you!',
+    this.testLabel = 'TEST DATA — NOT A REAL SALE',
+  }) : assert(discountCentavos >= 0);
+
+  final String storeName;
+  final String receiptTitle;
+  final List<ReceiptLineItem> items;
+  final int discountCentavos;
+  final String footer;
+  final String testLabel;
+
+  int get subtotalCentavos =>
+      items.fold(0, (sum, item) => sum + item.lineTotalCentavos);
+
+  int get totalCentavos => subtotalCentavos - discountCentavos;
+
+  bool get hasValidTotals =>
+      items.every((item) => item.quantity > 0 && item.unitPriceCentavos >= 0) &&
+      discountCentavos >= 0 &&
+      discountCentavos <= subtotalCentavos;
+}
+
+/// Renders receipt data into a monochrome 384-dot bitmap for ESC/POS raster printing.
 class ReceiptBitmap {
   static const int paperWidth = 384;
   static const double margin = 6;
   static const double contentWidth = paperWidth - margin * 2;
 
-  static Future<List<int>> buildSampleReceipt() async {
+  static String money(int centavos) {
+    final whole = centavos.abs() ~/ 100;
+    final fraction = (centavos.abs() % 100).toString().padLeft(2, '0');
+    return '${centavos < 0 ? '-' : ''}$whole.$fraction';
+  }
+
+  static ReceiptData sampleData() => const ReceiptData(
+        storeName: 'POS THERMAL TEST',
+        receiptTitle: 'DYNAMIC RECEIPT DEMO',
+        items: [
+          ReceiptLineItem(name: 'Coffee', quantity: 2, unitPriceCentavos: 6000),
+          ReceiptLineItem(name: 'Bread', quantity: 1, unitPriceCentavos: 4500),
+          ReceiptLineItem(name: 'Milk', quantity: 1, unitPriceCentavos: 7850),
+        ],
+        discountCentavos: 0,
+        footer: 'Thank you!',
+      );
+
+  static Future<List<int>> buildSampleReceipt() =>
+      buildReceipt(sampleData());
+
+  static Future<List<int>> buildReceipt(ReceiptData receipt) async {
+    if (!receipt.hasValidTotals) {
+      throw ArgumentError('Receipt totals are invalid. Check quantities, prices, and discount.');
+    }
+
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
     canvas.drawColor(const Color(0xFFFFFFFF), BlendMode.src);
@@ -52,8 +122,6 @@ class ReceiptBitmap {
       y += gapAfter + 3;
     }
 
-    // Fixed column anchors prevent spacing characters and proportional fonts
-    // from causing apparent alignment drift.
     void columns(
       String item,
       String qty,
@@ -82,6 +150,7 @@ class ReceiptBitmap {
         textDirection: TextDirection.ltr,
         textAlign: TextAlign.center,
         maxLines: 1,
+        ellipsis: '…',
       )..layout(maxWidth: qtyWidth);
       final amountPainter = TextPainter(
         text: TextSpan(text: amount, style: style),
@@ -99,26 +168,26 @@ class ReceiptBitmap {
           8;
     }
 
-    drawText('POS THERMAL TEST', size: 34, bold: true, align: TextAlign.center, gap: 4);
+    drawText(receipt.storeName, size: 34, bold: true, align: TextAlign.center, gap: 4);
     drawText('SENDA SDXP-210 · PT210A', size: 21, align: TextAlign.center, gap: 3);
-    drawText('CAPSTONE RECEIPT DEMO', size: 21, bold: true, align: TextAlign.center, gap: 8);
+    drawText(receipt.receiptTitle, size: 21, bold: true, align: TextAlign.center, gap: 8);
     separator();
 
     columns('ITEM', 'QTY', 'TOTAL', size: 22, bold: true);
     separator(gapAfter: 8);
-    columns('Coffee', '2', '120.00', size: 27);
-    columns('Bread', '1', '45.00', size: 27);
-    columns('Milk', '1', '78.50', size: 27);
+    for (final item in receipt.items) {
+      columns(item.name, item.quantity.toString(), money(item.lineTotalCentavos), size: 27);
+    }
     separator();
 
-    columns('Subtotal', '', '243.50', size: 25);
-    columns('Discount', '', '0.00', size: 25);
-    columns('TOTAL', '', '243.50', size: 31, bold: true);
+    columns('Subtotal', '', money(receipt.subtotalCentavos), size: 25);
+    columns('Discount', '', money(receipt.discountCentavos), size: 25);
+    columns('TOTAL', '', money(receipt.totalCentavos), size: 31, bold: true);
     separator();
 
-    drawText('Thank you!', size: 31, bold: true, align: TextAlign.center, gap: 5);
-    drawText('Bitmap receipt rendered by Flutter', size: 17, align: TextAlign.center, gap: 4);
-    drawText('TEST DATA — NOT A REAL SALE', size: 16, bold: true, align: TextAlign.center, gap: 0);
+    drawText(receipt.footer, size: 31, bold: true, align: TextAlign.center, gap: 5);
+    drawText('Flutter-rendered bitmap receipt', size: 17, align: TextAlign.center, gap: 4);
+    drawText(receipt.testLabel, size: 16, bold: true, align: TextAlign.center, gap: 0);
 
     final height = y.ceil() + 8;
     final picture = recorder.endRecording();
