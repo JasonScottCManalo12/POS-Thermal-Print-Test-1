@@ -120,6 +120,13 @@ class _ReceiptBuilderScreenState extends State<ReceiptBuilderScreen> {
 
   String _money(int centavos) => '₱${ReceiptBitmap.money(centavos)}';
 
+  String _previewLineTotal(_ReceiptRowControllers row) {
+    final quantity = int.tryParse(row.quantity.text.trim());
+    final unitPrice = _parseMoney(row.unitPrice.text);
+    if (quantity == null || quantity <= 0 || unitPrice == null) return '—';
+    return _money(quantity * unitPrice);
+  }
+
   @override
   Widget build(BuildContext context) {
     final receipt = _buildReceipt();
@@ -220,6 +227,34 @@ class _ReceiptBuilderScreenState extends State<ReceiptBuilderScreen> {
                             ),
                           ),
                         ],
+                      ),
+                      const SizedBox(height: 10),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 10,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          children: [
+                            const Expanded(
+                              child: Text(
+                                'ITEM TOTAL',
+                                style: TextStyle(fontWeight: FontWeight.w700),
+                              ),
+                            ),
+                            Text(
+                              _previewLineTotal(_rows[index]),
+                              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
