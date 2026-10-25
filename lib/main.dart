@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_classic_bluetooth/flutter_classic_bluetooth.dart';
 
@@ -33,6 +35,7 @@ class _PrinterTestHomeState extends State<PrinterTestHome> {
   BtcConnection? connection;
   bool loadingDevices = false;
   bool connecting = false;
+  bool printing = false;
   String status = 'Not connected';
   String? errorMessage;
 
@@ -139,6 +142,45 @@ class _PrinterTestHomeState extends State<PrinterTestHome> {
     }
   }
 
+  Future<void> printTestReceipt() async {
+    final active = connection;
+    if (active == null || printing) return;
+
+    setState(() {
+      printing = true;
+      errorMessage = null;
+      status = 'Sending test receipt…';
+    });
+
+    try {
+      // Basic ESC/POS sequence: initialize, print text, feed paper.
+      // No cutter command is sent because this portable printer may not have a cutter.
+      final bytes = <int>[
+        0x1B, 0x40, // ESC @ — initialize printer
+        ...'HELLO FROM FLUTTER!'.codeUnits,
+        0x0A,
+        0x0A,
+        0x0A,
+      ];
+
+      await active.output.add(Uint8List.fromList(bytes));
+      await active.output.allSent;
+
+      if (!mounted) return;
+      setState(() {
+        status = 'Test receipt sent — check the paper';
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        status = 'Print failed';
+        errorMessage = e.toString().replaceFirst('Exception: ', '');
+      });
+    } finally {
+      if (mounted) setState(() => printing = false);
+    }
+  }
+
   Future<void> disconnectPrinter() async {
     final active = connection;
     if (active == null) return;
@@ -239,12 +281,25 @@ class _PrinterTestHomeState extends State<PrinterTestHome> {
                     : const Icon(Icons.bluetooth_connected),
                 label: const Text('Connect to SENDA printer'),
               )
-            else
+            else ...[
+              FilledButton.icon(
+                onPressed: printing ? null : printTestReceipt,
+                icon: printing
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.print),
+                label: const Text('PRINT TEST RECEIPT'),
+              ),
+              const SizedBox(height: 8),
               OutlinedButton.icon(
                 onPressed: disconnectPrinter,
                 icon: const Icon(Icons.bluetooth_disabled),
                 label: const Text('Disconnect printer'),
               ),
+            ],
             if (errorMessage != null) ...[
               const SizedBox(height: 12),
               Text(errorMessage!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
@@ -274,8 +329,8 @@ class _PrinterTestHomeState extends State<PrinterTestHome> {
               ),
             const SizedBox(height: 8),
             const Text(
-              'This milestone checks paired-device access and Bluetooth connection only. '
-              'It does not send print data yet. The first print test comes after the connection is verified.',
+              'This milestone sends a minimal ESC/POS test sequence after Bluetooth connection. '
+              'It does not send GCash, payment, or transaction data.',
               textAlign: TextAlign.center,
             ),
           ],
