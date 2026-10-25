@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_classic_bluetooth/flutter_classic_bluetooth.dart';
+import 'printer_commands.dart';
 
 void main() => runApp(const ThermalPrintTestApp());
 
@@ -142,34 +143,21 @@ class _PrinterTestHomeState extends State<PrinterTestHome> {
     }
   }
 
-  Future<void> printTestReceipt() async {
+  Future<void> sendBytes(List<int> bytes, String successStatus) async {
     final active = connection;
     if (active == null || printing) return;
 
     setState(() {
       printing = true;
       errorMessage = null;
-      status = 'Sending test receipt…';
+      status = 'Sending print data…';
     });
 
     try {
-      // Basic ESC/POS sequence: initialize, print text, feed paper.
-      // No cutter command is sent because this portable printer may not have a cutter.
-      final bytes = <int>[
-        0x1B, 0x40, // ESC @ — initialize printer
-        ...'HELLO FROM FLUTTER!'.codeUnits,
-        0x0A,
-        0x0A,
-        0x0A,
-      ];
-
       await active.output.add(Uint8List.fromList(bytes));
       await active.output.allSent;
-
       if (!mounted) return;
-      setState(() {
-        status = 'Test receipt sent — check the paper';
-      });
+      setState(() => status = successStatus);
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -179,6 +167,22 @@ class _PrinterTestHomeState extends State<PrinterTestHome> {
     } finally {
       if (mounted) setState(() => printing = false);
     }
+  }
+
+  Future<void> printTestReceipt() async {
+    final bytes = [
+      ...PrinterCommands.initialize(),
+      ...PrinterCommands.text('HELLO FROM FLUTTER!'),
+      ...PrinterCommands.lineFeed(3),
+    ];
+    await sendBytes(bytes, 'Test receipt sent — check the paper');
+  }
+
+  Future<void> printFormattedReceipt() async {
+    await sendBytes(
+      PrinterCommands.formattedDemo(),
+      'Formatted receipt sent — check the paper',
+    );
   }
 
   Future<void> disconnectPrinter() async {
@@ -284,14 +288,14 @@ class _PrinterTestHomeState extends State<PrinterTestHome> {
             else ...[
               FilledButton.icon(
                 onPressed: printing ? null : printTestReceipt,
-                icon: printing
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.print),
+                icon: const Icon(Icons.print),
                 label: const Text('PRINT TEST RECEIPT'),
+              ),
+              const SizedBox(height: 8),
+              FilledButton.icon(
+                onPressed: printing ? null : printFormattedReceipt,
+                icon: const Icon(Icons.format_size),
+                label: const Text('PRINT FORMATTED RECEIPT'),
               ),
               const SizedBox(height: 8),
               OutlinedButton.icon(
@@ -329,8 +333,8 @@ class _PrinterTestHomeState extends State<PrinterTestHome> {
               ),
             const SizedBox(height: 8),
             const Text(
-              'This milestone sends a minimal ESC/POS test sequence after Bluetooth connection. '
-              'It does not send GCash, payment, or transaction data.',
+              'The formatted test uses standard ESC/POS commands for bold text, alignment, and double-size text. '
+              'The printer may support only a subset of these commands.',
               textAlign: TextAlign.center,
             ),
           ],
