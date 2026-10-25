@@ -1,9 +1,9 @@
 import 'dart:typed_data';
-import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_classic_bluetooth/flutter_classic_bluetooth.dart';
 import 'printer_commands.dart';
+import 'receipt_bitmap.dart';
 
 void main() => runApp(const ThermalPrintTestApp());
 
@@ -161,69 +161,12 @@ class _PrinterTestHomeState extends State<PrinterTestHome> {
     }
   }
 
-  Future<List<int>> buildBitmapTest() async {
-    // Render Flutter text to a 384-dot monochrome bitmap (typical 58 mm width).
-    const width = 384;
-    const height = 160;
-    final recorder = ui.PictureRecorder();
-    final canvas = Canvas(recorder);
-    canvas.drawRect(
-      Rect.fromLTWH(0, 0, width.toDouble(), height.toDouble()),
-      Paint()..color = const Color(0xFFFFFFFF),
-    );
-
-    final painter = TextPainter(
-      text: const TextSpan(
-        style: TextStyle(color: Color(0xFF000000), fontSize: 25, height: 1.35),
-        children: [
-          TextSpan(text: 'BITMAP PRINT TEST\\n', style: TextStyle(fontWeight: FontWeight.bold)),
-          TextSpan(text: 'Flutter-rendered text\\n'),
-          TextSpan(text: 'Custom fonts and layout\\n'),
-          TextSpan(text: '0123456789  ABC xyz'),
-        ],
-      ),
-      textDirection: TextDirection.ltr,
-      textAlign: TextAlign.center,
-    )..layout(maxWidth: width - 16);
-    painter.paint(canvas, Offset((width - painter.width) / 2, 12));
-
-    final picture = recorder.endRecording();
-    final image = await picture.toImage(width, height);
-    final data = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
-    image.dispose();
-    picture.dispose();
-    if (data == null) throw Exception('Could not convert Flutter text to bitmap.');
-
-    const bytesPerRow = width ~/ 8;
-    final raster = List<int>.filled(bytesPerRow * height, 0);
-    for (var y = 0; y < height; y++) {
-      for (var x = 0; x < width; x++) {
-        final offset = (y * width + x) * 4;
-        final red = data.getUint8(offset);
-        final green = data.getUint8(offset + 1);
-        final blue = data.getUint8(offset + 2);
-        final luminance = (red * 299 + green * 587 + blue * 114) ~/ 1000;
-        if (luminance < 160) {
-          raster[y * bytesPerRow + x ~/ 8] |= 0x80 >> (x % 8);
-        }
-      }
-    }
-
-    // ESC/POS GS v 0: raster bit image. Printer firmware support varies.
-    return [
-      ...PrinterCommands.initialize(),
-      0x1D, 0x76, 0x30, 0x00,
-      bytesPerRow & 0xFF, (bytesPerRow >> 8) & 0xFF,
-      height & 0xFF, (height >> 8) & 0xFF,
-      ...raster,
-      ...PrinterCommands.lineFeed(4),
-    ];
-  }
+  Future<List<int>> buildBitmapTest() => ReceiptBitmap.buildSampleReceipt();
 
   Future<void> printBitmapTest() async {
     try {
       final bytes = await buildBitmapTest();
-      await sendBytes(bytes, 'Bitmap test sent — check the paper');
+      await sendBytes(bytes, 'Custom bitmap receipt sent — check the paper');
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -341,7 +284,7 @@ class _PrinterTestHomeState extends State<PrinterTestHome> {
               FilledButton.icon(
                 onPressed: printing ? null : printBitmapTest,
                 icon: const Icon(Icons.image_outlined),
-                label: const Text('PRINT BITMAP FONT TEST'),
+                label: const Text('PRINT CUSTOM BITMAP RECEIPT'),
               ),
               const SizedBox(height: 8),
               OutlinedButton.icon(
@@ -367,7 +310,7 @@ class _PrinterTestHomeState extends State<PrinterTestHome> {
               )),
             const SizedBox(height: 8),
             const Text(
-              'The native font test exercises ESC/POS style controls. The bitmap test renders text in Flutter and sends a monochrome raster image; support for the raster command depends on printer firmware.',
+              'The native font test exercises ESC/POS style controls. The custom receipt test lays out item rows and totals in Flutter, then sends the whole receipt as a monochrome raster image.',
               textAlign: TextAlign.center,
             ),
           ],
