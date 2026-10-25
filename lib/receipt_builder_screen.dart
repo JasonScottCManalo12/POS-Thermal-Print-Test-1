@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'receipt_bitmap.dart';
+import 'receipt_preview_screen.dart';
 
 class _ReceiptRowControllers {
   _ReceiptRowControllers({
@@ -116,6 +117,20 @@ class _ReceiptBuilderScreenState extends State<ReceiptBuilderScreen> {
     }
     _error = null;
     return receipt;
+  }
+
+  Future<void> _openPreview() async {
+    final receipt = _buildReceipt();
+    setState(() {});
+    if (receipt == null) return;
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => ReceiptPreviewScreen(
+          receipt: receipt,
+          onPrint: () => widget.onPrint(receipt),
+        ),
+      ),
+    );
   }
 
   String _money(int centavos) => '₱${ReceiptBitmap.money(centavos)}';
@@ -305,6 +320,12 @@ class _ReceiptBuilderScreenState extends State<ReceiptBuilderScreen> {
               Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
             ],
             const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: receipt == null ? null : _openPreview,
+              icon: const Icon(Icons.visibility_outlined),
+              label: const Text('PREVIEW RECEIPT'),
+            ),
+            const SizedBox(height: 8),
             FilledButton.icon(
               onPressed: _sending || receipt == null
                   ? null
