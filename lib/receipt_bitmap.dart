@@ -2,10 +2,11 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
-/// Renders a larger, column-aligned receipt as a monochrome ESC/POS raster.
+/// Renders a bold, full-width 384-dot receipt for the SENDA printer test.
 class ReceiptBitmap {
   static const int paperWidth = 384;
-  static const double margin = 8;
+  static const double margin = 6;
+  static const double contentWidth = paperWidth - margin * 2;
 
   static Future<List<int>> buildSampleReceipt() async {
     final recorder = ui.PictureRecorder();
@@ -15,48 +16,59 @@ class ReceiptBitmap {
 
     void drawText(
       String text, {
-      double size = 21,
+      double size = 25,
       bool bold = false,
       TextAlign align = TextAlign.left,
-      double? width,
       double gap = 5,
     }) {
-      final maxWidth = width ?? (paperWidth - margin * 2);
       final painter = TextPainter(
         text: TextSpan(
           text: text,
           style: TextStyle(
             color: const Color(0xFF000000),
             fontSize: size,
-            fontWeight: bold ? FontWeight.bold : FontWeight.normal,
-            height: 1.12,
+            fontWeight: bold ? FontWeight.w700 : FontWeight.w400,
+            height: 1.0,
           ),
         ),
         textDirection: TextDirection.ltr,
         textAlign: align,
         maxLines: 1,
-      )..layout(maxWidth: maxWidth);
+        ellipsis: '…',
+      )..layout(maxWidth: contentWidth);
       painter.paint(canvas, Offset(margin, y));
       y += painter.height + gap;
     }
 
-    void drawSeparator() {
+    void separator({double gapAfter = 10}) {
       final paint = Paint()
         ..color = const Color(0xFF000000)
         ..strokeWidth = 2;
-      canvas.drawLine(Offset(margin, y + 2), Offset(paperWidth - margin, y + 2), paint);
-      y += 13;
+      canvas.drawLine(
+        Offset(margin, y + 2),
+        Offset(paperWidth - margin, y + 2),
+        paint,
+      );
+      y += gapAfter + 3;
     }
 
-    void drawColumns(String item, String qty, String total, {bool bold = false, double size = 20}) {
-      const itemWidth = 190.0;
-      const qtyWidth = 42.0;
-      const totalWidth = paperWidth - margin * 2 - itemWidth - qtyWidth;
+    // Fixed column anchors prevent spacing characters and proportional fonts
+    // from causing apparent alignment drift.
+    void columns(
+      String item,
+      String qty,
+      String amount, {
+      double size = 25,
+      bool bold = false,
+    }) {
+      const itemWidth = 174.0;
+      const qtyWidth = 48.0;
+      const amountWidth = contentWidth - itemWidth - qtyWidth;
       final style = TextStyle(
         color: const Color(0xFF000000),
         fontSize: size,
-        fontWeight: bold ? FontWeight.bold : FontWeight.normal,
-        height: 1.12,
+        fontWeight: bold ? FontWeight.w700 : FontWeight.w400,
+        height: 1.0,
       );
 
       final itemPainter = TextPainter(
@@ -71,41 +83,44 @@ class ReceiptBitmap {
         textAlign: TextAlign.center,
         maxLines: 1,
       )..layout(maxWidth: qtyWidth);
-      final totalPainter = TextPainter(
-        text: TextSpan(text: total, style: style),
+      final amountPainter = TextPainter(
+        text: TextSpan(text: amount, style: style),
         textDirection: TextDirection.ltr,
         textAlign: TextAlign.right,
         maxLines: 1,
-      )..layout(maxWidth: totalWidth);
+        ellipsis: '…',
+      )..layout(maxWidth: amountWidth);
 
       itemPainter.paint(canvas, Offset(margin, y));
       qtyPainter.paint(canvas, Offset(margin + itemWidth, y));
-      totalPainter.paint(canvas, Offset(margin + itemWidth + qtyWidth, y));
-      y += [itemPainter.height, qtyPainter.height, totalPainter.height].reduce((a, b) => a > b ? a : b) + 7;
+      amountPainter.paint(canvas, Offset(margin + itemWidth + qtyWidth, y));
+      y += [itemPainter.height, qtyPainter.height, amountPainter.height]
+              .reduce((a, b) => a > b ? a : b) +
+          8;
     }
 
-    drawText('POS THERMAL TEST', size: 29, bold: true, align: TextAlign.center, gap: 3);
-    drawText('SENDA SDXP-210 · PT210A', size: 18, align: TextAlign.center, gap: 2);
-    drawText('CAPSTONE RECEIPT DEMO', size: 18, bold: true, align: TextAlign.center, gap: 8);
-    drawSeparator();
+    drawText('POS THERMAL TEST', size: 34, bold: true, align: TextAlign.center, gap: 4);
+    drawText('SENDA SDXP-210 · PT210A', size: 21, align: TextAlign.center, gap: 3);
+    drawText('CAPSTONE RECEIPT DEMO', size: 21, bold: true, align: TextAlign.center, gap: 8);
+    separator();
 
-    drawColumns('ITEM', 'QTY', 'TOTAL', bold: true, size: 18);
-    drawSeparator();
-    drawColumns('Coffee', '2', '120.00', size: 22);
-    drawColumns('Bread', '1', '45.00', size: 22);
-    drawColumns('Milk', '1', '78.50', size: 22);
-    drawSeparator();
+    columns('ITEM', 'QTY', 'TOTAL', size: 22, bold: true);
+    separator(gapAfter: 8);
+    columns('Coffee', '2', '120.00', size: 27);
+    columns('Bread', '1', '45.00', size: 27);
+    columns('Milk', '1', '78.50', size: 27);
+    separator();
 
-    drawColumns('Subtotal', '', '243.50', size: 21);
-    drawColumns('Discount', '', '0.00', size: 21);
-    drawColumns('TOTAL', '', '243.50', bold: true, size: 27);
-    drawSeparator();
+    columns('Subtotal', '', '243.50', size: 25);
+    columns('Discount', '', '0.00', size: 25);
+    columns('TOTAL', '', '243.50', size: 31, bold: true);
+    separator();
 
-    drawText('Thank you!', size: 27, bold: true, align: TextAlign.center, gap: 4);
-    drawText('Bitmap receipt rendered by Flutter', size: 16, align: TextAlign.center, gap: 3);
-    drawText('Keep this receipt for testing only', size: 15, align: TextAlign.center, gap: 0);
+    drawText('Thank you!', size: 31, bold: true, align: TextAlign.center, gap: 5);
+    drawText('Bitmap receipt rendered by Flutter', size: 17, align: TextAlign.center, gap: 4);
+    drawText('TEST DATA — NOT A REAL SALE', size: 16, bold: true, align: TextAlign.center, gap: 0);
 
-    final height = y.ceil() + 10;
+    final height = y.ceil() + 8;
     final picture = recorder.endRecording();
     final image = await picture.toImage(paperWidth, height);
     final data = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
