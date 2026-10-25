@@ -63,7 +63,6 @@ class _PrinterTestHomeState extends State<PrinterTestHome> {
       loadingDevices = true;
       errorMessage = null;
     });
-
     try {
       final permission = await ensureBluetoothPermissions();
       if (permission == BtcPermissionStatus.permanentlyDenied) {
@@ -75,7 +74,6 @@ class _PrinterTestHomeState extends State<PrinterTestHome> {
       if (!await bluetooth.isEnabled()) {
         throw Exception('Turn on Bluetooth in Android settings, then tap Refresh.');
       }
-
       final devices = await bluetooth.getPairedDevices();
       if (!mounted) return;
       setState(() {
@@ -102,7 +100,6 @@ class _PrinterTestHomeState extends State<PrinterTestHome> {
       errorMessage = null;
       status = 'Connecting to SENDA SDXP-210…';
     });
-
     try {
       final permission = await ensureBluetoothPermissions();
       if (permission == BtcPermissionStatus.permanentlyDenied) {
@@ -111,14 +108,10 @@ class _PrinterTestHomeState extends State<PrinterTestHome> {
       if (permission == BtcPermissionStatus.denied) {
         throw Exception('Bluetooth permission was not granted.');
       }
-
-      final paired = pairedDevices.any(
-        (device) => device.address.toUpperCase() == printerAddress,
-      );
+      final paired = pairedDevices.any((device) => device.address.toUpperCase() == printerAddress);
       if (!paired) {
         throw Exception('SENDA printer was not found in paired devices. Refresh and check Android Bluetooth settings.');
       }
-
       final connected = await bluetooth.connect(
         address: printerAddress,
         timeout: const Duration(seconds: 12),
@@ -146,13 +139,11 @@ class _PrinterTestHomeState extends State<PrinterTestHome> {
   Future<void> sendBytes(List<int> bytes, String successStatus) async {
     final active = connection;
     if (active == null || printing) return;
-
     setState(() {
       printing = true;
       errorMessage = null;
       status = 'Sending print data…';
     });
-
     try {
       await active.output.add(Uint8List.fromList(bytes));
       await active.output.allSent;
@@ -170,19 +161,19 @@ class _PrinterTestHomeState extends State<PrinterTestHome> {
   }
 
   Future<void> printTestReceipt() async {
-    final bytes = [
+    await sendBytes([
       ...PrinterCommands.initialize(),
       ...PrinterCommands.text('HELLO FROM FLUTTER!'),
       ...PrinterCommands.lineFeed(3),
-    ];
-    await sendBytes(bytes, 'Test receipt sent — check the paper');
+    ], 'Test receipt sent — check the paper');
   }
 
   Future<void> printFormattedReceipt() async {
-    await sendBytes(
-      PrinterCommands.formattedDemo(),
-      'Formatted receipt sent — check the paper',
-    );
+    await sendBytes(PrinterCommands.formattedDemo(), 'Formatted receipt sent — check the paper');
+  }
+
+  Future<void> printFontTest() async {
+    await sendBytes(PrinterCommands.fontTestDemo(), 'Font test sent — check the paper');
   }
 
   Future<void> disconnectPrinter() async {
@@ -202,9 +193,7 @@ class _PrinterTestHomeState extends State<PrinterTestHome> {
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() {
-        errorMessage = e.toString().replaceFirst('Exception: ', '');
-      });
+      setState(() => errorMessage = e.toString().replaceFirst('Exception: ', ''));
     }
   }
 
@@ -220,10 +209,7 @@ class _PrinterTestHomeState extends State<PrinterTestHome> {
 
   @override
   Widget build(BuildContext context) {
-    final printerFound = pairedDevices.any(
-      (device) => device.address.toUpperCase() == printerAddress,
-    );
-
+    final printerFound = pairedDevices.any((device) => device.address.toUpperCase() == printerAddress);
     return Scaffold(
       appBar: AppBar(title: const Text('POS Thermal Print Test 1')),
       body: SafeArea(
@@ -232,57 +218,32 @@ class _PrinterTestHomeState extends State<PrinterTestHome> {
           children: [
             const Icon(Icons.print_outlined, size: 72),
             const SizedBox(height: 16),
-            Text(
-              'Bluetooth Thermal Printer Test',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.headlineSmall,
-            ),
+            Text('Bluetooth Thermal Printer Test', textAlign: TextAlign.center, style: Theme.of(context).textTheme.headlineSmall),
             const SizedBox(height: 8),
-            const Text(
-              'SENDA SDXP-210 · Model PT210A',
-              textAlign: TextAlign.center,
-            ),
+            const Text('SENDA SDXP-210 · Model PT210A', textAlign: TextAlign.center),
             const SizedBox(height: 24),
-            Card(
-              child: ListTile(
-                leading: Icon(
-                  connection == null ? Icons.bluetooth_searching : Icons.bluetooth_connected,
-                ),
-                title: const Text('Bluetooth connection'),
-                subtitle: Text(status),
-              ),
-            ),
-            const Card(
-              child: ListTile(
-                leading: Icon(Icons.receipt_long),
-                title: Text('First print test'),
-                subtitle: Text('HELLO FROM FLUTTER!'),
-                trailing: Text('Next'),
-              ),
-            ),
+            Card(child: ListTile(
+              leading: Icon(connection == null ? Icons.bluetooth_searching : Icons.bluetooth_connected),
+              title: const Text('Bluetooth connection'),
+              subtitle: Text(status),
+            )),
+            const Card(child: ListTile(
+              leading: Icon(Icons.receipt_long),
+              title: Text('First print test'),
+              subtitle: Text('HELLO FROM FLUTTER!'),
+              trailing: Text('Next'),
+            )),
             const SizedBox(height: 12),
             FilledButton.icon(
               onPressed: loadingDevices ? null : refreshPairedDevices,
-              icon: loadingDevices
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.refresh),
+              icon: loadingDevices ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.refresh),
               label: const Text('Refresh paired devices'),
             ),
             const SizedBox(height: 8),
             if (connection == null)
               FilledButton.icon(
                 onPressed: (!printerFound || connecting) ? null : connectToPrinter,
-                icon: connecting
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.bluetooth_connected),
+                icon: connecting ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.bluetooth_connected),
                 label: const Text('Connect to SENDA printer'),
               )
             else ...[
@@ -294,8 +255,14 @@ class _PrinterTestHomeState extends State<PrinterTestHome> {
               const SizedBox(height: 8),
               FilledButton.icon(
                 onPressed: printing ? null : printFormattedReceipt,
-                icon: const Icon(Icons.format_size),
+                icon: const Icon(Icons.receipt_long),
                 label: const Text('PRINT FORMATTED RECEIPT'),
+              ),
+              const SizedBox(height: 8),
+              FilledButton.icon(
+                onPressed: printing ? null : printFontTest,
+                icon: const Icon(Icons.format_size),
+                label: const Text('PRINT FONT TEST'),
               ),
               const SizedBox(height: 8),
               OutlinedButton.icon(
@@ -309,32 +276,19 @@ class _PrinterTestHomeState extends State<PrinterTestHome> {
               Text(errorMessage!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
             ],
             const SizedBox(height: 20),
-            Text('Paired devices (${pairedDevices.length})',
-                style: Theme.of(context).textTheme.titleMedium),
+            Text('Paired devices (${pairedDevices.length})', style: Theme.of(context).textTheme.titleMedium),
             if (pairedDevices.isEmpty && !loadingDevices)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 12),
-                child: Text('No paired devices were returned. Tap Refresh to try again.'),
-              ),
+              const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: Text('No paired devices were returned. Tap Refresh to try again.')),
             for (final device in pairedDevices)
-              Card(
-                child: ListTile(
-                  leading: Icon(
-                    device.address.toUpperCase() == printerAddress
-                        ? Icons.print
-                        : Icons.bluetooth,
-                  ),
-                  title: Text(device.displayName),
-                  subtitle: Text(device.address),
-                  trailing: device.address.toUpperCase() == printerAddress
-                      ? const Icon(Icons.check_circle, color: Colors.teal)
-                      : null,
-                ),
-              ),
+              Card(child: ListTile(
+                leading: Icon(device.address.toUpperCase() == printerAddress ? Icons.print : Icons.bluetooth),
+                title: Text(device.displayName),
+                subtitle: Text(device.address),
+                trailing: device.address.toUpperCase() == printerAddress ? const Icon(Icons.check_circle, color: Colors.teal) : null,
+              )),
             const SizedBox(height: 8),
             const Text(
-              'The formatted test uses standard ESC/POS commands for bold text, alignment, and double-size text. '
-              'The printer may support only a subset of these commands.',
+              'The font test exercises native ESC/POS bold, alignment, and size controls. The printer may support only a subset of these commands.',
               textAlign: TextAlign.center,
             ),
           ],
