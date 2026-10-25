@@ -27,8 +27,10 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Generate Android platform files
-        run: flutter create --platforms=android --project-name pos_thermal_print_test_1 --org com.posthermalprinttest .
+      - name: Generate Android platform files without replacing app source
+        run: |
+          flutter create --platforms=android --project-name pos_thermal_print_test_1 --org com.posthermalprinttest /tmp/pos_android_scaffold
+          cp -R /tmp/pos_android_scaffold/android ./android
 
       - name: Resolve dependencies
         run: flutter pub get
