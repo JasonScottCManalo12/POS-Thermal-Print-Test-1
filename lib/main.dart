@@ -42,6 +42,18 @@ class _PrinterTestHomeState extends State<PrinterTestHome> {
     refreshPairedDevices();
   }
 
+  Future<BtcPermissionStatus> ensureBluetoothPermissions() async {
+    const permissions = {BtcPermission.scan, BtcPermission.connect};
+    var permission = await bluetooth.checkPermissions(permissions: permissions);
+    if (permission == BtcPermissionStatus.denied) {
+      permission = await bluetooth.requestPermissions(permissions: permissions);
+    }
+    if (permission == BtcPermissionStatus.permanentlyDenied) {
+      await bluetooth.openAppSettings();
+    }
+    return permission;
+  }
+
   Future<void> refreshPairedDevices() async {
     setState(() {
       loadingDevices = true;
@@ -49,17 +61,9 @@ class _PrinterTestHomeState extends State<PrinterTestHome> {
     });
 
     try {
-      var permission = await bluetooth.checkPermissions(
-        permissions: {BtcPermission.connect},
-      );
-      if (permission == BtcPermissionStatus.denied) {
-        permission = await bluetooth.requestPermissions(
-          permissions: {BtcPermission.connect},
-        );
-      }
+      final permission = await ensureBluetoothPermissions();
       if (permission == BtcPermissionStatus.permanentlyDenied) {
-        await bluetooth.openAppSettings();
-        throw Exception('Bluetooth permission is denied. Check app settings, then tap Refresh.');
+        throw Exception('Bluetooth permission is denied. Allow Nearby devices in Android settings, then tap Refresh.');
       }
       if (permission == BtcPermissionStatus.denied) {
         throw Exception('Bluetooth permission was not granted.');
@@ -96,6 +100,14 @@ class _PrinterTestHomeState extends State<PrinterTestHome> {
     });
 
     try {
+      final permission = await ensureBluetoothPermissions();
+      if (permission == BtcPermissionStatus.permanentlyDenied) {
+        throw Exception('Bluetooth permission is denied. Allow Nearby devices in Android settings, then try again.');
+      }
+      if (permission == BtcPermissionStatus.denied) {
+        throw Exception('Bluetooth permission was not granted.');
+      }
+
       final paired = pairedDevices.any(
         (device) => device.address.toUpperCase() == printerAddress,
       );
