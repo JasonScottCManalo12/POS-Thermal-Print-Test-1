@@ -26,7 +26,7 @@ class PrinterTestHome extends StatefulWidget {
 }
 
 class _PrinterTestHomeState extends State<PrinterTestHome> {
-  static const printerAddress = '86:67:7A:BC:31:89';
+  static const printerAddress = '86:67:7A:8C:31:89';
   final bluetooth = FlutterClassicBluetooth();
 
   List<BtcDevice> pairedDevices = [];
