@@ -168,7 +168,7 @@ class _PrinterTestHomeState extends State<PrinterTestHome> {
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
     canvas.drawRect(
-      const Rect.fromLTWH(0, 0, width.toDouble(), height.toDouble()),
+      Rect.fromLTWH(0, 0, width.toDouble(), height.toDouble()),
       Paint()..color = const Color(0xFFFFFFFF),
     );
 
