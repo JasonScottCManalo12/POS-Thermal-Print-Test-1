@@ -2,66 +2,110 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
-/// Builds a sample receipt as a monochrome ESC/POS raster-image command.
-///
-/// Drawing the whole receipt in Flutter gives predictable layout regardless
-/// of the printer's built-in fonts. Width is 384 dots for a typical 58 mm
-/// printer; verify the paper width and printable area on the target device.
+/// Renders a larger, column-aligned receipt as a monochrome ESC/POS raster.
 class ReceiptBitmap {
   static const int paperWidth = 384;
-  static const int margin = 12;
+  static const double margin = 8;
 
   static Future<List<int>> buildSampleReceipt() async {
-    const rows = <_ReceiptRow>[
-      _ReceiptRow('POS THERMAL TEST', bold: true, size: 25, centered: true),
-      _ReceiptRow('SENDA SDXP-210 · PT210A', size: 16, centered: true),
-      _ReceiptRow('CAPSTONE RECEIPT DEMO', size: 16, centered: true),
-      _ReceiptRow('', size: 10),
-      _ReceiptRow('--------------------------------'),
-      _ReceiptRow('ITEM                  QTY   TOTAL', size: 16, bold: true),
-      _ReceiptRow('Coffee                  2  120.00'),
-      _ReceiptRow('Bread                   1   45.00'),
-      _ReceiptRow('Milk                    1   78.50'),
-      _ReceiptRow('--------------------------------'),
-      _ReceiptRow('Subtotal                    243.50'),
-      _ReceiptRow('Discount                      0.00'),
-      _ReceiptRow('TOTAL                       243.50', bold: true, size: 21),
-      _ReceiptRow(''),
-      _ReceiptRow('Thank you!', bold: true, size: 21, centered: true),
-      _ReceiptRow('Bitmap layout rendered by Flutter', size: 14, centered: true),
-      _ReceiptRow(''),
-    ];
-
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
     canvas.drawColor(const Color(0xFFFFFFFF), BlendMode.src);
     var y = 8.0;
 
-    for (final row in rows) {
-      if (row.text.isEmpty) {
-        y += row.size.toDouble() * 0.65;
-        continue;
-      }
+    void drawText(
+      String text, {
+      double size = 21,
+      bool bold = false,
+      TextAlign align = TextAlign.left,
+      double? width,
+      double gap = 5,
+    }) {
+      final maxWidth = width ?? (paperWidth - margin * 2);
       final painter = TextPainter(
         text: TextSpan(
-          text: row.text,
+          text: text,
           style: TextStyle(
             color: const Color(0xFF000000),
-            fontSize: row.size.toDouble(),
-            fontWeight: row.bold ? FontWeight.bold : FontWeight.normal,
-            height: 1.2,
+            fontSize: size,
+            fontWeight: bold ? FontWeight.bold : FontWeight.normal,
+            height: 1.12,
           ),
         ),
         textDirection: TextDirection.ltr,
-        textAlign: row.centered ? TextAlign.center : TextAlign.left,
+        textAlign: align,
         maxLines: 1,
-      )..layout(maxWidth: paperWidth - margin * 2);
-      final x = row.centered ? (paperWidth - painter.width) / 2 : margin.toDouble();
-      painter.paint(canvas, Offset(x, y));
-      y += painter.height + 3;
+      )..layout(maxWidth: maxWidth);
+      painter.paint(canvas, Offset(margin, y));
+      y += painter.height + gap;
     }
 
-    final height = y.ceil() + 8;
+    void drawSeparator() {
+      final paint = Paint()
+        ..color = const Color(0xFF000000)
+        ..strokeWidth = 2;
+      canvas.drawLine(Offset(margin, y + 2), Offset(paperWidth - margin, y + 2), paint);
+      y += 13;
+    }
+
+    void drawColumns(String item, String qty, String total, {bool bold = false, double size = 20}) {
+      const itemWidth = 190.0;
+      const qtyWidth = 42.0;
+      const totalWidth = paperWidth - margin * 2 - itemWidth - qtyWidth;
+      final style = TextStyle(
+        color: const Color(0xFF000000),
+        fontSize: size,
+        fontWeight: bold ? FontWeight.bold : FontWeight.normal,
+        height: 1.12,
+      );
+
+      final itemPainter = TextPainter(
+        text: TextSpan(text: item, style: style),
+        textDirection: TextDirection.ltr,
+        maxLines: 1,
+        ellipsis: '…',
+      )..layout(maxWidth: itemWidth);
+      final qtyPainter = TextPainter(
+        text: TextSpan(text: qty, style: style),
+        textDirection: TextDirection.ltr,
+        textAlign: TextAlign.center,
+        maxLines: 1,
+      )..layout(maxWidth: qtyWidth);
+      final totalPainter = TextPainter(
+        text: TextSpan(text: total, style: style),
+        textDirection: TextDirection.ltr,
+        textAlign: TextAlign.right,
+        maxLines: 1,
+      )..layout(maxWidth: totalWidth);
+
+      itemPainter.paint(canvas, Offset(margin, y));
+      qtyPainter.paint(canvas, Offset(margin + itemWidth, y));
+      totalPainter.paint(canvas, Offset(margin + itemWidth + qtyWidth, y));
+      y += [itemPainter.height, qtyPainter.height, totalPainter.height].reduce((a, b) => a > b ? a : b) + 7;
+    }
+
+    drawText('POS THERMAL TEST', size: 29, bold: true, align: TextAlign.center, gap: 3);
+    drawText('SENDA SDXP-210 · PT210A', size: 18, align: TextAlign.center, gap: 2);
+    drawText('CAPSTONE RECEIPT DEMO', size: 18, bold: true, align: TextAlign.center, gap: 8);
+    drawSeparator();
+
+    drawColumns('ITEM', 'QTY', 'TOTAL', bold: true, size: 18);
+    drawSeparator();
+    drawColumns('Coffee', '2', '120.00', size: 22);
+    drawColumns('Bread', '1', '45.00', size: 22);
+    drawColumns('Milk', '1', '78.50', size: 22);
+    drawSeparator();
+
+    drawColumns('Subtotal', '', '243.50', size: 21);
+    drawColumns('Discount', '', '0.00', size: 21);
+    drawColumns('TOTAL', '', '243.50', bold: true, size: 27);
+    drawSeparator();
+
+    drawText('Thank you!', size: 27, bold: true, align: TextAlign.center, gap: 4);
+    drawText('Bitmap receipt rendered by Flutter', size: 16, align: TextAlign.center, gap: 3);
+    drawText('Keep this receipt for testing only', size: 15, align: TextAlign.center, gap: 0);
+
+    final height = y.ceil() + 10;
     final picture = recorder.endRecording();
     final image = await picture.toImage(paperWidth, height);
     final data = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
@@ -78,7 +122,7 @@ class ReceiptBitmap {
         final green = data.getUint8(offset + 1);
         final blue = data.getUint8(offset + 2);
         final luminance = (red * 299 + green * 587 + blue * 114) ~/ 1000;
-        if (luminance < 160) {
+        if (luminance < 180) {
           raster[py * bytesPerRow + px ~/ 8] |= 0x80 >> (px % 8);
         }
       }
@@ -93,18 +137,4 @@ class ReceiptBitmap {
       ...List<int>.filled(4, 0x0A),
     ];
   }
-}
-
-class _ReceiptRow {
-  final String text;
-  final bool bold;
-  final int size;
-  final bool centered;
-
-  const _ReceiptRow(
-    this.text, {
-    this.bold = false,
-    this.size = 18,
-    this.centered = false,
-  });
 }
